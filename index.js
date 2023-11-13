@@ -1,6 +1,7 @@
 import { getOrCreateLogGroup } from '#lib/cloudwatch.js';
 import { startDataSyncTransfer } from '#lib/datasync.js';
 import { getOrCreateDataSyncRole } from '#lib/iam.js';
+import { logger } from '#lib/logger.js';
 import { createBucket, updateBucketClonePolicy } from '#lib/s3.js';
 import { getAwsAccountInfo } from '#lib/sts.js';
 import { S3Client } from '@aws-sdk/client-s3';
@@ -20,8 +21,8 @@ import { S3Client } from '@aws-sdk/client-s3';
  */
 
 /**
- * Copy S3 objects from source bucket to destination bucket, using the AWS
- * DataSync service.
+ * Initiate a DataSync task that copies all S3 objects from source bucket to
+ * destination bucket.
  * 
  * The source and destination bucket can be in the same AWS accounts, or in
  * different accounts.
@@ -67,7 +68,7 @@ import { S3Client } from '@aws-sdk/client-s3';
  *   permissions.
  * 
  * @param {string} taskName
- * Name to assign to the the DataSync task that will be created.
+ * Short, descriptive name to assign to the the DataSync task that will be created.
  * 
  * @param {S3BucketLocation} source
  * Details about the bucket to copy from.
@@ -148,37 +149,91 @@ import { S3Client } from '@aws-sdk/client-s3';
  * );
  * ```
  */
-export async function copyBucket(taskName, source, destination, role, logGroup) {
+export async function initCopyBucket(taskName, source, destination, role, logGroup) {
+  logger.debug(`Initiating S3 transfer from "${source.bucketName}" to "${destination.bucketName}"...`);
+  
   const destS3 = new S3Client(destination.awsConfig);
-  const srcAccount = await getAwsAccountInfo(source.awsConfig);
-  const dataSyncUserArn = `${srcAccount.Arn}`;
-  const accountId = `${srcAccount.Account}`;
-  const dataSyncLogGroup = await getOrCreateLogGroup(logGroup, source.awsConfig);
-  const dataSyncRole = await getOrCreateDataSyncRole(role, accountId, source.awsConfig);
 
-  // create destination bucket
-  const destBucket = await createBucket(destination.bucketName, destS3);
+  // prepare AWS account info
+  logger.debug('Fetching AWS account info...');
+  try {
+    var srcAccount = await getAwsAccountInfo(source.awsConfig);
+  }
+  catch (e) {
+    logger.error('Failed to fetch AWS account info.', e);
+    throw e;
+  }
+
+  const { Arn: dataSyncUserArn, Account: accountId } = srcAccount;
+
+  // prepare CloudWatch log group
+  logger.debug(`Fetching info on CloudWatch log group "${logGroup}"...`);
+  try {
+    var dataSyncLogGroup = await getOrCreateLogGroup(logGroup, source.awsConfig);
+  }
+  catch (e) {
+    logger.error(`Failed to fetch log group info".`, e);
+    throw e;
+  }
+  
+  // prepare IAM role
+  logger.debug(`Fetching info on IAM role "${role}...`);
+  try {
+    var dataSyncRole = await getOrCreateDataSyncRole(role, `${accountId}`, source.awsConfig);
+  }
+  catch (e) {
+    logger.error(`Failed to fetch IAM role info".`, e);
+    throw e;
+  }
+
+  // prepare destination bucket
+  logger.debug(`Creating destination S3 bucket "${destination.bucketName}"...`);
+  try {
+    var destBucket = await createBucket(destination.bucketName, destS3);
+  }
+  catch (e) {
+    logger.error(`Failed to create S3 bucket.`, e);
+    throw e;
+  }
 
   // update destination bucket policy
-  await updateBucketClonePolicy(
-    destination.bucketName,
-    dataSyncUserArn,
-    `${dataSyncRole.Arn}`,
-    destS3
-  );
+  logger.debug(`Updating policy for bucket "${destination.bucketName}...`);
+  try {
+    await updateBucketClonePolicy(
+      destination.bucketName,
+      `${dataSyncUserArn}`,
+      `${dataSyncRole.Arn}`,
+      destS3
+    );
+  }
+  catch (e) {
+    logger.error(`Failed to update bucket policy.`, e);
+    throw e;
+  }
 
   // copy S3 objects from source to destination bucket
-  const dataSyncResources = await startDataSyncTransfer(
-    taskName,
-    source.bucketName,
-    destination.bucketName,
-    `${dataSyncRole.Arn}`,
-    `${dataSyncLogGroup.arn}`,
-    source.awsConfig
-  );
+  logger.debug(`Initiating DataSync transfer between buckets "${source.bucketName} and "${destination.bucketName}"...`);
+  try {
+    var dataSyncResources = await startDataSyncTransfer(
+      taskName,
+      source.bucketName,
+      destination.bucketName,
+      `${dataSyncRole.Arn}`,
+      `${dataSyncLogGroup.arn}`,
+      source.awsConfig
+    );
+  }
+  catch (e) {
+    logger.error(`Failed to initate DataSync transfer.`, e);
+    throw e;
+  }
 
-  return {
+  const allResources = {
     destBucket,
     ...dataSyncResources
   };
+
+  logger.info('S3 transfer succesfully initiated.', dataSyncResources.transferExec);
+
+  return allResources;
 }
