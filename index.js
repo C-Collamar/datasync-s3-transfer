@@ -90,8 +90,13 @@ import { S3Client } from '@aws-sdk/client-s3';
  */
 
 /**
- * Create and execute DataSync tasks to transfer S3 objects from a set of
- * source buckets to their destination buckets.
+ * Create and execute DataSync tasks to transfer S3 objects by iterating a given
+ * list of source and destination buckets whose objects to transfer from and to,
+ * respectively.
+ * 
+ * Each iteration processes the next pair of source and destination S3 buckets
+ * specified in `transferTasks`, then creates and executes a DataSync task to
+ * transfer S3 objects between the buckets.
  * 
  * @param {TransferTaskInput[]} transferTasks
  * List of source and destination buckets where to perform the transfer.
@@ -112,7 +117,7 @@ import { S3Client } from '@aws-sdk/client-s3';
  * 
  * @returns Resources created as byproduct of each DataSync task execution.
  */
-export async function executeS3DataSyncTransfer(transferTasks, options, srcAwsConfig, destAwsConfig) {
+export async function* executeS3DataSyncTransfer(transferTasks, options, srcAwsConfig, destAwsConfig) {
   const srcDataSyncClient = new DataSyncClient(srcAwsConfig);
   const destS3Client = new S3Client(destAwsConfig);
   const results = [];
@@ -128,6 +133,7 @@ export async function executeS3DataSyncTransfer(transferTasks, options, srcAwsCo
     );
 
     results.push(result);
+    yield result;
   }
 
   return results;
