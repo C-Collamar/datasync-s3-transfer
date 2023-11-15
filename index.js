@@ -1,5 +1,4 @@
 import { createDataSyncLocation, createTask, startTask } from '#lib/datasync.js';
-import { logger } from '#lib/logger.js';
 import { createBucket, updateDestBucketPolicy } from '#lib/s3.js';
 import { DataSyncClient } from '@aws-sdk/client-datasync';
 import { S3Client } from '@aws-sdk/client-s3';
@@ -233,20 +232,15 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
    */
   const output = {};
 
-  logger.debug(`Initiating transfer from bucket "${srcBucket}" to "${destBucket}"...`);
-
   // prepare destination bucket
-  logger.debug(`Creating destination S3 bucket "${destBucket}"...`);
   try {
     await createBucket(destBucket, destS3Client);
   }
   catch (e) {
-    logger.error(`Failed to create S3 bucket.`, e);
     return output;
   }
 
   // update destination bucket policy
-  logger.debug(`Updating policy for bucket "${destBucket}...`);
   try {
     await updateDestBucketPolicy(
       destBucket,
@@ -256,12 +250,10 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
     );
   }
   catch (e) {
-    logger.error(`Failed to update bucket policy.`, e);
     return output;
   }
 
   // create datasync S3 source
-  logger.debug(`Creating DataSync S3 location for source bucket "${srcBucket}"...`);
   try {
     let response = await createDataSyncLocation(
       `arn:aws:s3:::${srcBucket}`,
@@ -279,12 +271,10 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
     output.dataSyncSrcLocation = response.LocationArn;
   }
   catch (e) {
-    logger.error(`Failed to create DataSync source location.`, e);
     return output;
   }
 
   // create datasync s3 destination
-  logger.debug(`Creating DataSync S3 location for destination bucket "${destBucket}"...`);
   try {
     let response = await createDataSyncLocation(
       `arn:aws:s3:::${destBucket}`,
@@ -302,12 +292,10 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
     output.dataSyncDestLocation = response.LocationArn;
   }
   catch (e) {
-    logger.error('Failed to create DataSync destination location.', e);
     return output;
   }
 
   // prepare transfer task
-  logger.debug('Creating DataSync task to initiate S3 object transferring...');
   try {
     let response = await createTask(
       taskName,
@@ -327,12 +315,10 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
     output.dataSyncTask = response.TaskArn;
   }
   catch (e) {
-    logger.error('Failed to create DataSync task.', e);
     return output;
   }
 
   // execute transfer task
-  logger.debug(`Initiating DataSync transfer between buckets "${srcBucket} and "${destBucket}"...`);
   try {
     let response = await startTask(output.dataSyncTask, srcDataSyncClient);
 
@@ -346,7 +332,6 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
     output.dataSyncTaskExec = response.TaskExecutionArn;
   }
   catch (e) {
-    logger.error(`Failed to initate DataSync transfer.`, e);
     return output;
   }
 

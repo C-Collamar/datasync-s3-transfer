@@ -12,8 +12,7 @@
   "license": "BSD-3-Clause",
   "dependencies": {
     "@aws-sdk/client-datasync": "^3.437.0",
-    "@aws-sdk/client-s3": "^3.435.0",
-    "winston": "^3.11.0"
+    "@aws-sdk/client-s3": "^3.435.0"
   },
   "imports": {
     "#lib/*.js": "./lib/*.js"
