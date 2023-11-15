@@ -1,5 +1,5 @@
 import { createDataSyncLocation, createTask, startTask } from '#lib/datasync.js';
-import { createBucket, updateDestBucketPolicy } from '#lib/s3.js';
+import { updateDestBucketPolicy } from '#lib/s3.js';
 import { DataSyncClient } from '@aws-sdk/client-datasync';
 import { S3Client } from '@aws-sdk/client-s3';
 
@@ -167,7 +167,7 @@ export function initDataSyncS3Transfer(srcAwsConfig, destAwsConfig, options) {
    * call to {@link initDataSyncS3Transfer}.
    *
    * @param {string} destBucket
-   * Non-existent S3 bucket name where objects will be copied to.
+   * Existing S3 bucket name where objects will be copied to.
    *
    * The destination bucket must belong to the same AWS account that the
    * `destS3Client` argument is configured for during the initialization call to
@@ -208,7 +208,7 @@ export function initDataSyncS3Transfer(srcAwsConfig, destAwsConfig, options) {
  * `srcDatasyncClient` argument is configured for.
  *
  * @param {string} destBucket
- * Non-existent S3 bucket name where objects will be copied to.
+ * Existing S3 bucket name where objects will be copied to.
  *
  * The destination bucket must belong to the same AWS account that the
  * `destS3Client` argument is configured for.
@@ -231,14 +231,6 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
    * @type {Partial<DataSyncS3TransferOutput>}.
    */
   const output = {};
-
-  // prepare destination bucket
-  try {
-    await createBucket(destBucket, destS3Client);
-  }
-  catch (e) {
-    return output;
-  }
 
   // update destination bucket policy
   try {
