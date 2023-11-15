@@ -187,6 +187,39 @@ export function initDataSyncS3Transfer(srcAwsConfig, destAwsConfig, options) {
 }
 
 /**
+ * Check if there is a missing step in making a DataSync transfer, based on the
+ * given transfer output.
+ * 
+ * If there is, an {@link Error} is constructed, containing details as to which
+ * step of the transfer process did the transfer started failing.
+ * 
+ * @param {Partial<DataSyncS3TransferOutput>} transferOutput
+ * The transfer output.
+ * 
+ * @returns An {@link Error} if there is, `null` otherwise.
+ */
+export function checkIncompleteTransfer(transferOutput) {
+  let cause = '';
+
+  if (!transferOutput.dataSyncSrcLocation) {
+    cause = 'No DataSync source location found.';
+  }
+  else if (!transferOutput.dataSyncDestLocation) {
+    cause = 'No DataSync destination location found.';
+  }
+  else if (!transferOutput.dataSyncTask) {
+    cause = 'No DataSync task found.';
+  }
+  else if (!transferOutput.dataSyncTaskExec) {
+    cause = 'No DataSync task execution found.';
+  }
+
+  return cause === ''
+    ? null
+    : new Error('Transfer process is incomplete.', { cause });
+}
+
+/**
  * Create and execute a DataSync task to transfer S3 objects from source to
  * destination bucket.
  * 
