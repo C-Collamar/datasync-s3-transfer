@@ -11,11 +11,8 @@
   "author": "Christian Collamar <christian.collamar@gmail.com> (https://github.com/c-collamar)",
   "license": "BSD-3-Clause",
   "dependencies": {
-    "@aws-sdk/client-cloudwatch-logs": "^3.441.0",
     "@aws-sdk/client-datasync": "^3.437.0",
-    "@aws-sdk/client-iam": "^3.444.0",
     "@aws-sdk/client-s3": "^3.435.0",
-    "@aws-sdk/client-sts": "^3.441.0",
     "winston": "^3.11.0"
   },
   "imports": {

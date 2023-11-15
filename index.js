@@ -1,16 +1,8 @@
-import { getOrCreateLogGroup } from '#lib/cloudwatch.js';
 import { createDataSyncLocation, createTask, startTask } from '#lib/datasync.js';
-import { getOrCreateDataSyncRole } from '#lib/iam.js';
 import { logger } from '#lib/logger.js';
-import { createBucket, extractBucketName, updateDestBucketPolicy } from '#lib/s3.js';
-import { getAwsAccountInfo } from '#lib/sts.js';
+import { createBucket, updateDestBucketPolicy } from '#lib/s3.js';
 import { DataSyncClient } from '@aws-sdk/client-datasync';
 import { S3Client } from '@aws-sdk/client-s3';
-
-export {
-  initDataSyncS3Transfer,
-  getOrCreateLogGroup
-};
 
 /**
  * AWS client [configuration and credential][1] settings.
@@ -152,7 +144,7 @@ export {
  * 
  * @see {@link execDataSyncS3Transfer} on how to use the returned function to make transfers.
  */
-function initDataSyncS3Transfer(srcAwsConfig, destAwsConfig, options) {
+export function initDataSyncS3Transfer(srcAwsConfig, destAwsConfig, options) {
   const srcDataSyncClient = new DataSyncClient(srcAwsConfig);
   const destS3Client = new S3Client(destAwsConfig);
 
