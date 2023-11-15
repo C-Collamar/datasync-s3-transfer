@@ -20,5 +20,6 @@
   },
   "imports": {
     "#lib/*.js": "./lib/*.js"
-  }
+  },
+  "exports": "./index.js"
 }

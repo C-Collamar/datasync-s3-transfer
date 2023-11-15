@@ -7,6 +7,11 @@ import { getAwsAccountInfo } from '#lib/sts.js';
 import { DataSyncClient } from '@aws-sdk/client-datasync';
 import { S3Client } from '@aws-sdk/client-s3';
 
+export {
+  initDataSyncS3Transfer,
+  getOrCreateLogGroup
+};
+
 /**
  * AWS client [configuration and credential][1] settings.
  * 
@@ -147,7 +152,7 @@ import { S3Client } from '@aws-sdk/client-s3';
  * 
  * @see {@link execDataSyncS3Transfer} on how to use the returned function to make transfers.
  */
-export function initDataSyncS3Transfer(srcAwsConfig, destAwsConfig, options) {
+function initDataSyncS3Transfer(srcAwsConfig, destAwsConfig, options) {
   const srcDataSyncClient = new DataSyncClient(srcAwsConfig);
   const destS3Client = new S3Client(destAwsConfig);
 
