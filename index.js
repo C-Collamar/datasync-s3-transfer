@@ -199,24 +199,27 @@ export function initDataSyncS3Transfer(srcAwsConfig, destAwsConfig, options) {
  * @returns An {@link Error} if there is, `null` otherwise.
  */
 export function checkIncompleteTransfer(transferOutput) {
-  let cause = '';
+  let missing = [];
 
   if (!transferOutput.dataSyncSrcLocation) {
-    cause = 'No DataSync source location found.';
+    missing.push('source location');
   }
-  else if (!transferOutput.dataSyncDestLocation) {
-    cause = 'No DataSync destination location found.';
+  if (!transferOutput.dataSyncDestLocation) {
+    missing.push('destination location');
   }
-  else if (!transferOutput.dataSyncTask) {
-    cause = 'No DataSync task found.';
+  if (!transferOutput.dataSyncTask) {
+    missing.push('task');
   }
-  else if (!transferOutput.dataSyncTaskExec) {
-    cause = 'No DataSync task execution found.';
+  if (!transferOutput.dataSyncTaskExec) {
+    missing.push('task execution');
   }
 
-  return cause === ''
+  return missing.length === 0
     ? null
-    : new Error('Transfer process is incomplete.', { cause });
+    : new Error(
+        'Transfer process is incomplete.',
+        { cause: `DataSync resources missing: ${missing.join(', ')}.` }
+      );
 }
 
 /**
