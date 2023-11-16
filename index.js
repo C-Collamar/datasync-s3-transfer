@@ -260,13 +260,15 @@ export function checkIncompleteTransfer(transferOutput) {
  * Client for the DataSync service of the same AWS account that owns the source
  * bucket.
  * 
- * @returns Resources created as byproduct of the DataSync task execution.
+ * @returns
+ * Resources created as byproduct of the DataSync task execution, and a
+ * contained exception if there is any during processing.
  */
 async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options, destS3Client, srcDataSyncClient) {
   /**
    * @type {Partial<DataSyncS3TransferOutput>}.
    */
-  const output = {};
+  const result = {};
 
   // update destination bucket policy
   try {
@@ -277,8 +279,8 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
       destS3Client
     );
   }
-  catch (e) {
-    return output;
+  catch (error) {
+    return { result, error };
   }
 
   // create datasync S3 source
@@ -296,10 +298,10 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
       );
     }
 
-    output.dataSyncSrcLocation = response.LocationArn;
+    result.dataSyncSrcLocation = response.LocationArn;
   }
-  catch (e) {
-    return output;
+  catch (error) {
+    return { result, error };
   }
 
   // create datasync s3 destination
@@ -317,18 +319,18 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
       );
     }
 
-    output.dataSyncDestLocation = response.LocationArn;
+    result.dataSyncDestLocation = response.LocationArn;
   }
-  catch (e) {
-    return output;
+  catch (error) {
+    return { result, error };
   }
 
   // prepare transfer task
   try {
     let response = await createTask(
       taskName,
-      output.dataSyncSrcLocation,
-      output.dataSyncDestLocation,
+      result.dataSyncSrcLocation,
+      result.dataSyncDestLocation,
       options.srcCloudWatchLogGroup,
       srcDataSyncClient
     );
@@ -340,15 +342,15 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
       );
     }
 
-    output.dataSyncTask = response.TaskArn;
+    result.dataSyncTask = response.TaskArn;
   }
-  catch (e) {
-    return output;
+  catch (error) {
+    return { result, error };
   }
 
   // execute transfer task
   try {
-    let response = await startTask(output.dataSyncTask, srcDataSyncClient);
+    let response = await startTask(result.dataSyncTask, srcDataSyncClient);
 
     if (!response.TaskExecutionArn) {
       throw new Error(
@@ -357,11 +359,11 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
       );
     }
 
-    output.dataSyncTaskExec = response.TaskExecutionArn;
+    result.dataSyncTaskExec = response.TaskExecutionArn;
   }
-  catch (e) {
-    return output;
+  catch (error) {
+    return { result, error };
   }
 
-  return output;
+  return { result, error: null };
 }
