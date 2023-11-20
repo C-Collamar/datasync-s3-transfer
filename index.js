@@ -177,10 +177,25 @@ export function initDataSyncS3Transfer(srcAwsConfig, destAwsConfig, options) {
    * name to assign to the DataSync transfer task that will be created and
    * executed.
    * 
+   * @param {Partial<DataSyncS3TransferOutput>} prevState
+   * If the call to this function fails for any reason, it likely causes at
+   * least one resource, meant to be created for the transfer, to not be
+   * created.
+   * 
+   * In these cases, this function allows you to retry the failed resource
+   * creation(s), by feeding onto this parameter the previous output that this
+   * function has returned, which contains the AWS resources created so far.
+   * When this is done, this function will reuse any created resources instead
+   * of creating them, and only create ones that have not been created.
+   * 
+   * If you pass onto this parameter with all resources created, this function
+   * will not create anymore resources, and will only create a new execution of
+   * the provided task.
+   * 
    * @returns All DataSync created for the transfer.
    */
-  function execDataSyncS3Transfer(srcBucket, destBucket, taskName) {
-    return _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options, destS3Client, srcDataSyncClient);
+  function execDataSyncS3Transfer(srcBucket, destBucket, taskName, prevState = {}) {
+    return _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options, destS3Client, srcDataSyncClient, prevState);
   }
   
   return execDataSyncS3Transfer;
@@ -259,12 +274,27 @@ export function checkIncompleteTransfer(transferOutput) {
  * @param {DataSyncClient} srcDataSyncClient
  * Client for the DataSync service of the same AWS account that owns the source
  * bucket.
+   * 
+   * @param {Partial<DataSyncS3TransferOutput>} prevState
+   * If the call to this function fails for any reason, it likely causes at
+   * least one resource, meant to be created for the transfer, to not be
+   * created.
+   * 
+   * In these cases, this function allows you to retry the failed resource
+   * creation(s), by feeding onto this parameter the previous output that this
+   * function has returned, which contains the AWS resources created so far.
+   * When this is done, this function will reuse any created resources instead
+   * of creating them, and only create ones that have not been created.
+   * 
+   * If you pass onto this parameter with all resources created, this function
+   * will not create anymore resources, and will only create a new execution of
+   * the provided task.
  * 
  * @returns
  * Resources created as byproduct of the DataSync task execution, and a
  * contained exception if there is any during processing.
  */
-async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options, destS3Client, srcDataSyncClient) {
+async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options, destS3Client, srcDataSyncClient, prevState) {
   /**
    * @type {Partial<DataSyncS3TransferOutput>}.
    */
@@ -283,69 +313,84 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
     return { result, error };
   }
 
-  // create datasync S3 source
-  try {
-    let response = await createDataSyncLocation(
-      `arn:aws:s3:::${srcBucket}`,
-      options.srcDataSyncRole,
-      srcDataSyncClient
-    );
-
-    if (!response.LocationArn) {
-      throw new Error(
-        'DataSync location ARN not found.',
-        { cause: 'No ARN returned from server.' }
+  // prepare datasync S3 source
+  if (prevState.dataSyncSrcLocation) {
+    result.dataSyncSrcLocation = prevState.dataSyncSrcLocation;
+  }
+  else {
+    try {
+      let response = await createDataSyncLocation(
+        `arn:aws:s3:::${srcBucket}`,
+        options.srcDataSyncRole,
+        srcDataSyncClient
       );
+  
+      if (!response.LocationArn) {
+        throw new Error(
+          'DataSync location ARN not found.',
+          { cause: 'No ARN returned from server.' }
+        );
+      }
+  
+      result.dataSyncSrcLocation = response.LocationArn;
     }
-
-    result.dataSyncSrcLocation = response.LocationArn;
-  }
-  catch (error) {
-    return { result, error };
+    catch (error) {
+      return { result, error };
+    }
   }
 
-  // create datasync s3 destination
-  try {
-    let response = await createDataSyncLocation(
-      `arn:aws:s3:::${destBucket}`,
-      options.srcDataSyncRole,
-      srcDataSyncClient
-    );
-
-    if (!response.LocationArn) {
-      throw new Error(
-        'DataSync location ARN not found.',
-        { cause: 'No ARN returned from server.' }
+  // prepare datasync s3 destination
+  if (prevState.dataSyncDestLocation) {
+    result.dataSyncDestLocation = prevState.dataSyncDestLocation;
+  }
+  else {
+    try {
+      let response = await createDataSyncLocation(
+        `arn:aws:s3:::${destBucket}`,
+        options.srcDataSyncRole,
+        srcDataSyncClient
       );
+  
+      if (!response.LocationArn) {
+        throw new Error(
+          'DataSync location ARN not found.',
+          { cause: 'No ARN returned from server.' }
+        );
+      }
+  
+      result.dataSyncDestLocation = response.LocationArn;
     }
-
-    result.dataSyncDestLocation = response.LocationArn;
-  }
-  catch (error) {
-    return { result, error };
+    catch (error) {
+      return { result, error };
+    }
   }
 
   // prepare transfer task
-  try {
-    let response = await createTask(
-      taskName,
-      result.dataSyncSrcLocation,
-      result.dataSyncDestLocation,
-      options.srcCloudWatchLogGroup,
-      srcDataSyncClient
-    );
-
-    if (!response.TaskArn) {
-      throw new Error(
-        'DataSync task ARN not found.',
-        { cause: 'No ARN returned from server.' }
-      );
-    }
-
-    result.dataSyncTask = response.TaskArn;
+  if (prevState.dataSyncTask) {
+    result.dataSyncTask = prevState.dataSyncTask;
   }
-  catch (error) {
-    return { result, error };
+  else {
+    try {
+      let response = await createTask(
+        taskName,
+        result.dataSyncSrcLocation,
+        result.dataSyncDestLocation,
+        options.srcCloudWatchLogGroup,
+        srcDataSyncClient
+      );
+  
+      if (!response.TaskArn) {
+        throw new Error(
+          'DataSync task ARN not found.',
+          { cause: 'No ARN returned from server.' }
+        );
+      }
+  
+      result.dataSyncTask = response.TaskArn;
+    }
+    catch (error) {
+      return { result, error };
+    }
   }
 
   // execute transfer task
