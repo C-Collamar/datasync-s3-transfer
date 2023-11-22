@@ -12,7 +12,29 @@ Automate S3 object transfers between buckets via DataSync!
 
 ## System Design
 
-![](https://mermaid.ink/img/pako:eNp1UsFOwzAM_ZUop03q2IFbD0iIceRUEBLtDibxWLU2qRJHME37d5xkhQ62Hlrn9fnFfvZBKqtRlnLT2U-1BUfiedUYwY8nPs1msyp-5_N5RltTLysbnEIBRguNnloD1Foj3oPaIfmiacz9ayWUQ-0LsQKCam-UsENkMYKkbpbrLDfYrlX7un4ZNBBO5VglC54461OGd6qzqq4fHMaMUZ7pPpdV3QomJI0xJ8peSZo2cCGTwO8upZED4zfoEmEk4xfyHY_8DoTXSDZQvZwoOcx1-9EST3ZIttshuT6ZhlgseABDiMEdR-NI0jHbdAZlr86gkxVTLxMeSzwz6w-a1f9LREZCY_O_NsRKudOxVA5_us-VcXeykD26HlrN-3eI_xtJW-yxkSWHGtyukY05Mg8C2eiXLMkFLGRI67Jq4cNBL8sNdJ5R1C1Z95QXOu11IQcwb9aOnOM37u77tg?type=png)
+```mermaid
+flowchart TD
+    start(((Start)))
+    in[/Source and destination buckets,\nAWS creds, DataSync options, etc./]
+    policy[[Update destination\nbucket policy]]
+    srcloc[[Create DataSync\nsource S3 location]]
+    destloc[[Create DataSync\ndestination S3 location]]
+    task[[Create DataSync\ntransfer task]]
+    exec[[Execute\ntransfer task]]
+    out[/DataSync\nresources/]
+    stop(((Stop)))
+
+    start -- input --> in
+    in --> policy
+    in --> srcloc
+    in --> destloc
+    srcloc --> task
+    destloc --> task
+    policy --> destloc
+    task --> exec
+    exec -- output --> out
+    out --> stop
+```
 
 ## Transfer Assumptions
 
