@@ -1,20 +1,18 @@
-# Problem Statement
+# Use Case
 
-- S3 buckets needs to be replicated to the new environment.
-- Current data in the existing environment cannot be used in the new environment without replicating S3 buckets.
-
-# Goal
-
-Migrate tenant data from existing environment to anothr environment.
+- Transfer S3 objects between AWS S3 buckets via DataSync, without having to click around the AWS Console.
+- S3 transfer can be between buckets in the same AWS accounts, or across different accounts.
+- The necessary DataSync resources are generated for you, so you you don't have to.
+- Create automation scripts using this package, to initiate batch DataSync transfers between many buckets.
 
 # System Design
 
-[![](https://mermaid.ink/img/pako:eNptkkFvwjAMhf-KlTMIDQaTOGyaxHUnJk1ay8EkLmSkcZW42hDw31caijZoTkn0-eU5zwel2ZCaq8Lxt95iEHhf5B6a9ZCNnI0CkeugCda13pHE0QqGw2cYHzAQoHNghcqY574KrClGMi-nVD9uwaPnI0yyyuodePq5kQPrQbYE54dWuU-FsV5vAlZbMBTFehTLvuMjSV0lbNLqY5bpQCjUQ69WicSWfMyyujL9JFTsrLYUuxLyJm1uLF3cC_eJaMfe-s3fR6dXe68fS1ig4HLvNTjWbeX54woOnSx606N7NZU6nqbDtD3MskwC-lhQAF5_kZYIReCy3-hdd7MU5r_A9hSP8HQJ_5rq3RiogSoplGhNMz2Hs0KumihLytW82RoqsHaSq9yfGhRr4XPnai6hpoFKSSwsNt9aqnmBLja3ZKxweEsT2Q7mQFXoP5k75vQLmsLn2Q?type=png)](https://mermaid.live/edit#pako:eNptkkFvwjAMhf-KlTMIDQaTOGyaxHUnJk1ay8EkLmSkcZW42hDw31caijZoTkn0-eU5zwel2ZCaq8Lxt95iEHhf5B6a9ZCNnI0CkeugCda13pHE0QqGw2cYHzAQoHNghcqY574KrClGMi-nVD9uwaPnI0yyyuodePq5kQPrQbYE54dWuU-FsV5vAlZbMBTFehTLvuMjSV0lbNLqY5bpQCjUQ69WicSWfMyyujL9JFTsrLYUuxLyJm1uLF3cC_eJaMfe-s3fR6dXe68fS1ig4HLvNTjWbeX54woOnSx606N7NZU6nqbDtD3MskwC-lhQAF5_kZYIReCy3-hdd7MU5r_A9hSP8HQJ_5rq3RiogSoplGhNMz2Hs0KumihLytW82RoqsHaSq9yfGhRr4XPnai6hpoFKSSwsNt9aqnmBLja3ZKxweEsT2Q7mQFXoP5k75vQLmsLn2Q)
+![](https://mermaid.ink/img/pako:eNp1UsFOwzAM_ZUop03q2IFbD0iIceRUEBLtDibxWLU2qRJHME37d5xkhQ62Hlrn9fnFfvZBKqtRlnLT2U-1BUfiedUYwY8nPs1msyp-5_N5RltTLysbnEIBRguNnloD1Foj3oPaIfmiacz9ayWUQ-0LsQKCam-UsENkMYKkbpbrLDfYrlX7un4ZNBBO5VglC54461OGd6qzqq4fHMaMUZ7pPpdV3QomJI0xJ8peSZo2cCGTwO8upZED4zfoEmEk4xfyHY_8DoTXSDZQvZwoOcx1-9EST3ZIttshuT6ZhlgseABDiMEdR-NI0jHbdAZlr86gkxVTLxMeSzwz6w-a1f9LREZCY_O_NsRKudOxVA5_us-VcXeykD26HlrN-3eI_xtJW-yxkSWHGtyukY05Mg8C2eiXLMkFLGRI67Jq4cNBL8sNdJ5R1C1Z95QXOu11IQcwb9aOnOM37u77tg?type=png)
 
-# Assumptions
+# Design Assumptions
 
 There are assumptions made in the making of this project. If any assumptions
-are not met, then this package may not work as intended.
+are not met, then this package may not work for you.
 
 - For cross-account bucket transfers, where the source and destination buckets
   belong to different AWS accounts, it is the source AWS account that initiates
