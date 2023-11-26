@@ -1,7 +1,7 @@
 {
   "name": "datasync-s3-transfer",
   "version": "1.0.0",
-  "description": "Transfer S3 object between buckets via DataSync.",
+  "description": "Automate S3 object transfers between buckets via DataSync",
   "type": "module",
   "main": "index.js",
   "scripts": {
