@@ -1,5 +1,5 @@
 {
-  "name": "datasync-s3-transfer",
+  "name": "@c-collamar/datasync-s3-transfer",
   "version": "1.0.0",
   "description": "Automate S3 object transfers between buckets via DataSync",
   "type": "module",

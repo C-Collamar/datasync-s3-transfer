@@ -31,7 +31,7 @@ Automate S3 object transfers between buckets via DataSync!
      // source aws account id, where your source bucket is in
      srcDataSyncPrincipal: '123456789012',
    
-     // source iam role, with access to the source and destination buckets (see docs to set permissions)
+     // source iam role, with access to the source and destination buckets (see notes on permissions)
      srcDataSyncRole: 'arn:aws:iam::123456789012:role/MyExistingRole',
    
      // source cloudwatch log group, where datasync will record logs into
@@ -86,9 +86,9 @@ Automate S3 object transfers between buckets via DataSync!
    );
    ```
 
-1. How to properly handle errors? See [Error Handling](#error-handling) for details.
+1. How to properly handle errors? See [Error Handling and Retries](#error-handling-and-retries) for details.
 
-## How A Transfer Is Made
+## How a Transfer is Made
 
 Each time a transfer is made using this tool, the following AWS resources are created under the same AWS account that owns the source S3 bucket, in order:
 
@@ -97,11 +97,50 @@ Each time a transfer is made using this tool, the following AWS resources are cr
 1. DataSync task with a fixed configuration (e.g., basic logging enabled), used to initiate a transfer.
 1. DataSync task execution, which is the byproduct of executing the created DataSync task.
 
-Information on these created resources are then returned from the `transfer()` call, referenced under the [Usage](#usage) section.
+Information on these created resources are then returned from the transfer call, in the `result` variable as seen below.
 
-## Error Handling
+```js
+// start the transfer
+const { result, error } = await transfer('source-bucket', 'destination-bucket', 'Transfer to my other bucket');
+```
 
-Errors can happen at any point during the transfer process, from network issues all the way up to misconfigurations on your part. In any case... work in progress.
+## Error Handling and Retries
+
+Errors can happen at any point during the transfer process, from network issues all the way up to misconfigurations on your part. In any case, you can check for errors via the `error` property returned by the transfer call.
+
+```js
+const { result, error } = await transfer('source-bucket', 'destination-bucket', 'Transfer to my other bucket');
+
+if (error) {
+  console.error(error);
+}
+else {
+  console.info('Transfer success!');
+}
+```
+
+### Retrying a Failed Transfer
+
+Understanding [How a Transfer is Made](#how-a-transfer-is-made), it is possible for an unexpected error (e.g., network or system error) to arise during any of the AWS resource-creation step. This can cause the transfer to become incomplete, where some of the necessary AWS resources have already been created, while the rest have not yet.
+
+In this case, you can retry the transfer as follows:
+
+```js
+let transferState = await transfer('source-bucket', 'destination-bucket', 'Transfer to my other bucket');
+
+// retry on error
+while (transferState.error) {
+  console.error(transferState.error);
+  console.info('Retrying...');
+
+  // you can also make retry optional by prompting retry confirmation first before executing this retry statement below
+  transferState = await transfer('source-bucket', 'destination-bucket', 'Transfer to my other bucket', transferState.result);
+}
+
+// you can also retry despite script termination by exporting transferState.result, to a file for example
+```
+
+This way, successfully created AWS resources will be reused when retrying the transfer. Without supplying the `transferState.result` argument in the example above, calling `transfer()` mutiple times will create a new set of resources, which will likely cause AWS to complain about resource duplication.
 
 ## System Design
 
@@ -114,7 +153,7 @@ flowchart TD
     destloc[[Create DataSync\ndestination S3 location]]
     task[[Create DataSync\ntransfer task]]
     exec[[Execute\ntransfer task]]
-    out[/DataSync\nresources/]
+    out[/DataSync source S3 location,\nDataSync destination S3 location,\nDataSync task,\nDataSync task execution/]
     stop(((Stop)))
 
     start -- input --> in
