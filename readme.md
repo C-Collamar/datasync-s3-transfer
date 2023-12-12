@@ -1,8 +1,6 @@
 # DataSync S3 Transfer
 Automate S3 object transfers between buckets via DataSync!
 
-> 🚧 This guide is under construction. 🚧
-
 ## Use Case
 
 - Transfer S3 objects between AWS S3 buckets via DataSync, without having to click around the AWS Console.
