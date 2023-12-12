@@ -8,7 +8,7 @@ Automate S3 object transfers between buckets via DataSync!
 - Transfer S3 objects between AWS S3 buckets via DataSync, without having to click around the AWS Console.
 - S3 transfer can be between buckets in the same AWS accounts, or across different accounts.
 - The necessary DataSync resources are generated for you, so you you don't have to.
-- Create automation scripts using this tool, to initiate batch DataSync transfers between many buckets.
+- Create automation scripts using this tool, to initiate batch S3 object transfers between many buckets.
 
 ## Usage
 
@@ -180,7 +180,41 @@ are not met, then this tool may not work prooperly.
 
 ### IAM Role Permissions
 
-Work in progress.
+The IAM role, whose ARN is passed in the `srcDataSyncRole` DataSync initialization option, must have the necessaary permissions as shown in the following policy document:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": [
+        "s3:GetBucketLocation",
+        "s3:ListBucket",
+        "s3:ListBucketMultipartUploads"
+      ],
+      "Effect": "Allow",
+      "Resource": "arn:aws:s3:::*"
+    },
+    {
+      "Action": [
+        "s3:AbortMultipartUpload",
+        "s3:DeleteObject",
+        "s3:GetObject",
+        "s3:ListMultipartUploadParts",
+        "s3:GetObjectTagging",
+        "s3:PutObjectTagging",
+        "s3:PutObject"
+      ],
+      "Effect": "Allow",
+      "Resource": "arn:aws:s3:::*/*"
+    }
+  ]
+}
+```
+
+The idea is to allow certain actions on S3 objects that belong to the source and destination buckets. And by scoping the `Resource` properties as such, you can initiate S3 object transfers from _any_ buckets in the source AWS accuont, to _any_ buckets in the destination AWS account.
+
+That being said, you can limit the scope of the `Resource` policy elements by explicitly listing the source and destination buckets only. Just keep in mind that S3 object transfers will not work if neither the source nor destination bucket is not included in this scope.
 
 [1]: https://docs.aws.amazon.com/datasync/latest/userguide/tutorial_s3-s3-cross-account-transfer.html#awsui-tabs-1-9159-user-permissions-2
 [2]: https://repost.aws/knowledge-center/s3-large-transfer-between-buckets
