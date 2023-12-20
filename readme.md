@@ -4,8 +4,9 @@ Automate S3 object transfers between buckets via DataSync!
 ## Use Case
 
 - Transfer S3 objects between AWS S3 buckets via DataSync, without having to click around the AWS Console.
-- S3 transfer can be between buckets in the same AWS accounts, or across different accounts.
 - The necessary DataSync resources are generated for you, so you you don't have to.
+- S3 transfer can be between buckets in the same AWS accounts, or across different accounts.
+- for cross-account transfers, you can specify whether the source or destination AWS account does the transfer. (See issue [#1][3].)
 - Create automation scripts using this tool, to initiate batch S3 object transfers between many buckets.
 
 ## Usage
@@ -26,23 +27,34 @@ Automate S3 object transfers between buckets via DataSync!
    const destAwsProfile = srcAwsProfile;
    
    const dataSyncOptions = {
-     // source aws account id, where your source bucket is in
-     srcDataSyncPrincipal: '123456789012',
+     /**
+      * Whether it is the "source" or "destination" AWS account that does the
+      * copying of S3 objects, i.e., the initiating account. For cross-account
+      * transfers, this dictates which AWS account the necessary DataSync
+      * resources will be created under. But for same-account transfers, then
+      * setting we want is...
+      */
+     initiatingAccount: 'source',
+    
+     // source or destination aws account id, whichever is the initiating account
+     dataSyncPrincipal: '123456789012',
+
+     /**
+      * Exisging IAM role from the initiating AWS account, with access to the
+      * source and destination buckets. (See notes on permissions.)
+      */
+     dataSyncRole: 'arn:aws:iam::123456789012:role/MyExistingRole',
    
-     // source iam role, with access to the source and destination buckets (see notes on permissions)
-     srcDataSyncRole: 'arn:aws:iam::123456789012:role/MyExistingRole',
-   
-     // source cloudwatch log group, where datasync will record logs into
-     srcCloudWatchLogGroup: 'arn:aws:logs:ap-northeast-1:123456789012:log-group:/aws/datasync:*'
+     // existing cloudwatch log group under the initiating account, where datasync will record logs into
+     cloudWatchLogGroup: 'arn:aws:logs:ap-northeast-1:123456789012:log-group:/aws/datasync:*'
    };
    ```
 
    Notes:
 
    - If you want to do cross-account S3 object transfers, i.e., where the destination bucket is owned by a different AWS account than the source bucket, then set a different profile for `destAwsProfile` similar to `srcAwsProfile`.
-
-   - The IAM role specified in `dataSyncoptions.srcDataSyncRole` must have the necessary permissions for DataSync to assume. See [IAM Role Permissions](#iam-role-permissions) on how the role must be setup.
-   
+   - the IAM user behind the AWS config provided in `srcAwsProfile` or `destAwsProfile`, depending if `initiatingAccount` equals `source` or `destination` respectively, must have DataSync-related permissoins set up first. See requirements on [IAM User Permissions](#iam-user-permissions).
+   - The IAM role specified in `dataSyncoptions.dataSyncRole` must have the necessary permissions for DataSync to assume. See [IAM Role Permissions](#iam-role-permissions) on how the role must be setup.
 
 1. Start the transfer. That's it!
    ```js
@@ -59,7 +71,7 @@ Automate S3 object transfers between buckets via DataSync!
    );
    ```
 
-   After the call to `transfer()` has been made, source S3 objects will be copied to the destination bucket the after some time. See under the hood on [How A Transfer Is Made](#how-a-transfer-is-made).
+   After the `transfer()` call is made, source S3 objects will be copied to the destination bucket the after some time. See under the hood on [How A Transfer Is Made](#how-a-transfer-is-made).
 
 1. Multiple transfers? Yes we can!
 
@@ -88,14 +100,21 @@ Automate S3 object transfers between buckets via DataSync!
 
 ## How a Transfer is Made
 
-Each time a transfer is made using this tool, the following AWS resources are created under the same AWS account that owns the source S3 bucket, in order:
+Everytime a transfer call is made, the following happens under the hood within the initiating AWS account:
 
-1. DataSync source S3 location, pointing to the source S3 bucket.
-1. DataSync destination S3 location, pointing to the destination S3 bucket.
-1. DataSync task with a fixed configuration (e.g., basic logging enabled), used to initiate a transfer.
-1. DataSync task execution, which is the byproduct of executing the created DataSync task.
+1. A DataSync source S3 location is created, poining to the source S3 bucket.
 
-Information on these created resources are then returned from the transfer call, in the `result` variable as seen below.
+   If the initiating AWS account does not own the source bucket, then the source bucket policy is first updated in order to permit the initiating account to create the DataSync location.
+
+1. A DataSync destination S3 location is created, pointing to the destination S3 bucket.
+
+   If the initiating AWS account does not own the destination bucket, then the destination bucket policy is first updated in order to permit the initiating account to create the DataSync location. 
+
+1. A DataSync transfer task is created.
+
+1. The DataSync task is then executed, which creates a DataSync task execution resource and initiates the transfer of S3 objects between the source and destination DataSync locations.
+
+Information on these created resources are then returned from the transfer call, into the `result` variable as seen below.
 
 ```js
 // start the transfer
@@ -113,7 +132,7 @@ if (error) {
   console.error(error);
 }
 else {
-  console.info('Transfer success!');
+  console.info('Transfer successful!');
 }
 ```
 
@@ -140,41 +159,32 @@ while (transferState.error) {
 
 This way, successfully created AWS resources will be reused when retrying the transfer. Without supplying the `transferState.result` argument in the example above, calling `transfer()` mutiple times will create a new set of resources, which will likely cause AWS to complain about resource duplication.
 
-## System Design
+## Permissions
 
-```mermaid
-flowchart TD
-    start(((Start)))
-    in[/Source and destination buckets,\nAWS creds, DataSync options, etc./]
-    policy[[Update destination\nbucket policy]]
-    srcloc[[Create DataSync\nsource S3 location]]
-    destloc[[Create DataSync\ndestination S3 location]]
-    task[[Create DataSync\ntransfer task]]
-    exec[[Execute\ntransfer task]]
-    out[/DataSync source S3 location,\nDataSync destination S3 location,\nDataSync task,\nDataSync task execution/]
-    stop(((Stop)))
+### IAM User Permissions
 
-    start -- input --> in
-    in --> policy
-    in --> srcloc
-    in --> destloc
-    srcloc --> task
-    destloc --> task
-    policy --> destloc
-    task --> exec
-    exec -- output --> out
-    out --> stop
-```
+In order to create the necessary DataSync resources on the initiating AWS account, this script assumes the IAM user behind the provided AWS config of the initiating account. In other words, using the code snippet from the [Usage](#usage) section as context, if `initiatingAccount` equals `source`, then the `srcAwsProfile` is used to create said resources. Else, if `initiatingAccount` equals `destination`, then the `destAwsProfile` is used instead.
 
-## Design Choices and Assumptions
+This implies that the IAM user assumed by this script must be permitted certain actions in order to setup the DataSync-S3 transfer. These actions are:
 
-Assumptions has to be made in making this project. If any assumptions
-are not met, then this tool may not work prooperly.
-
-- For cross-account bucket transfers, the transfer is initiated and managed from the source AWS account, rather than from the destination account.
-- The source AWS config provided is assumed to be an IAM user who has the
-  necessary permissions to perform DataSync-related actions. For more
-  information on the required permissions, see [Tutorial: Transferring data from Amazon S3 to Amazon S3 across AWS accounts - AWS DataSync][1].
+- `datasync:CancelTaskExecution`
+- `datasync:CreateLocationS3`
+- `datasync:CreateTask`
+- `datasync:DescribeLocation*`
+- `datasync:DescribeTask`
+- `datasync:DescribeTaskExecution`
+- `datasync:ListLocations`
+- `datasync:ListTasks`
+- `datasync:ListTaskExecutions`
+- `datasync:StartTaskExecution`
+- `iam:AttachRolePolicy`
+- `iam:CreateRole`
+- `iam:CreatePolicy`
+- `iam:ListRoles`
+- `iam:PassRole`
+- `s3:GetBucketLocation`
+- `s3:ListAllMyBuckets`
+- `s3:ListBucket`
 
 ### IAM Role Permissions
 
@@ -214,5 +224,27 @@ The idea is to allow certain actions on S3 objects that belong to the source and
 
 That being said, you can limit the scope of the `Resource` policy elements by explicitly listing the source and destination buckets only. Just keep in mind that S3 object transfers will not work if neither the source nor destination bucket is not included in this scope.
 
-[1]: https://docs.aws.amazon.com/datasync/latest/userguide/tutorial_s3-s3-cross-account-transfer.html#awsui-tabs-1-9159-user-permissions-2
+## High-Level System Design
+
+```mermaid
+flowchart TD
+    start(((Start)))
+    in[/Source and destination buckets,\nAWS creds, DataSync options, etc./]
+    policy[[Update source or destination\nbucket policy as necessary]]
+    locs[[Create DataSync source and\ndestination S3 locations]]
+    task[[Create DataSync\ntransfer task]]
+    exec[[Execute\ntransfer task]]
+    out[/DataSync source S3 location,\nDataSync destination S3 location,\nDataSync task,\nDataSync task execution/]
+    stop(((Stop)))
+
+    start -- input --> in
+    in --> policy
+    policy --> locs
+    locs --> task
+    task --> exec
+    exec -- output --> out
+    out --> stop
+```
+
 [2]: https://repost.aws/knowledge-center/s3-large-transfer-between-buckets
+[3]: https://github.com/C-Collamar/datasync-s3-transfer/issues/1

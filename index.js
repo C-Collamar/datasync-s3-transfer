@@ -1,5 +1,5 @@
 import { createDataSyncLocation, createTask, startTask } from '#lib/datasync.js';
-import { updateDestBucketPolicy } from '#lib/s3.js';
+import { updateBucketPolicy } from '#lib/s3.js';
 import { DataSyncClient } from '@aws-sdk/client-datasync';
 import { S3Client } from '@aws-sdk/client-s3';
 
@@ -18,34 +18,38 @@ import { S3Client } from '@aws-sdk/client-s3';
 /**
  * Options for DataSync-S3 bucket transfer.
  * @typedef DataSyncS3TransferOptions
+ * 
+ * @property {'source' | 'destination'} initiatingAccount
+ * Indicates whether the source or destination AWS account will be used for
+ * creating the necessary DataSync resources, and will be responsible for
+ * initiating the S3 object transfer.
  *
- * @property {string} srcCloudWatchLogGroup
+ * @property {string} cloudWatchLogGroup
  * ARN of an existing CloudWatch log group, where DataSync logs will be recorded
  * into.
  *
- * The log group must be owned by the same AWS account that owns the source S3
- * bucket.
+ * The log group must be owned by the initiating AWS account.
  *
- * @property {string} srcDataSyncPrincipal
- * [AWS principal][1] under the source AWS account (i.e., the same account where
- * the  source S3 bucket belongs to), to be granted `s3:ListBucket` on the the
- * destination bucket.
+ * @property {string} dataSyncPrincipal
+ * [AWS principal][1] scoped to the initiating AWS account, to be granted
+ * `s3:ListBucket` on the the bucket pressumably not owned by the initiating AWS
+ * account.
  *
- * This is useful for finer security control over the destination S3 bucket,
+ * This is useful for finer security control over the latter S3 bucket,
  * [especially for cross-account S3 transfers][2], wherein the source and
  * destination buckets are owned by different AWS accounts. If the buckets
- * belong to the same AWS account, you want to specify the AWS account ID as
+ * belong to the same AWS account, you can simply specify the AWS account ID as
  * principal, or a narrower version involving it (e.g., an existing IAM role).
  *
  * [1]: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_principal.html#Principal_specifying
  * [2]: https://docs.aws.amazon.com/datasync/latest/userguide/tutorial_s3-s3-cross-account-transfer.html#s3-s3-cross-account-update-s3-policy-destination-account
  *
- * @property {string} srcDataSyncRole
+ * @property {string} dataSyncRole
  * ARN of an existing IAM role that DataSync will assume when executing the
  * transfer task.
  *
- * This role must have the [necessary permissions][1] for the transfer task to
- * execute successfully.
+ * This role must be owned by the initiating AWS account, and must have the
+ * [necessary permissions][1] for the transfer task to execute successfully.
  *
  * [1]: https://docs.aws.amazon.com/datasync/latest/userguide/create-s3-location.html#create-role-manually
  */
@@ -144,7 +148,13 @@ import { S3Client } from '@aws-sdk/client-s3';
  * @see {@link execDataSyncS3Transfer} on how to use the returned function to make transfers.
  */
 export function initDataSyncS3Transfer(srcAwsConfig, destAwsConfig, options) {
-  const srcDataSyncClient = new DataSyncClient(srcAwsConfig);
+  const dataSyncClient = new DataSyncClient(
+    options.initiatingAccount === 'source'
+      ? srcAwsConfig
+      : destAwsConfig
+  );
+
+  const srcS3Client = new S3Client(srcAwsConfig);
   const destS3Client = new S3Client(destAwsConfig);
 
   /**
@@ -195,7 +205,7 @@ export function initDataSyncS3Transfer(srcAwsConfig, destAwsConfig, options) {
    * @returns All DataSync created for the transfer.
    */
   function execDataSyncS3Transfer(srcBucket, destBucket, taskName, prevState = {}) {
-    return _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options, destS3Client, srcDataSyncClient, prevState);
+    return _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options, srcS3Client, destS3Client, dataSyncClient, prevState);
   }
   
   return execDataSyncS3Transfer;
@@ -267,13 +277,16 @@ export function checkIncompleteTransfer(transferOutput) {
  * @param {DataSyncS3TransferOptions} options
  * Additional options for DataSync-S3 bucket transfer.
  * 
+ * @param {S3Client} srcS3Client
+ * Client for the S3 service of the same AWS account that owns the source
+ * bucket.
+ * 
  * @param {S3Client} destS3Client
  * Client for the S3 service of the same AWS account that owns the destination
  * bucket.
  * 
- * @param {DataSyncClient} srcDataSyncClient
- * Client for the DataSync service of the same AWS account that owns the source
- * bucket.
+ * @param {DataSyncClient} dataSyncClient
+ * Client for the DataSync service of the initiating AWS account.
    * 
    * @param {Partial<DataSyncS3TransferOutput>} prevState
    * If the call to this function fails for any reason, it likely causes at
@@ -294,23 +307,39 @@ export function checkIncompleteTransfer(transferOutput) {
  * Resources created as byproduct of the DataSync task execution, and a
  * contained exception if there is any during processing.
  */
-async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options, destS3Client, srcDataSyncClient, prevState) {
+async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options, srcS3Client, destS3Client, dataSyncClient, prevState) {
   /**
    * @type {Partial<DataSyncS3TransferOutput>}.
    */
   const result = {};
 
-  // update destination bucket policy
-  try {
-    await updateDestBucketPolicy(
-      destBucket,
-      options.srcDataSyncPrincipal,
-      options.srcDataSyncRole,
-      destS3Client
-    );
+  // allow creating datasync location for either source or destination bucket if
+  // the bucket is not owned by the initiating aws account
+  if (options.initiatingAccount === 'source') {
+    try {
+      await updateBucketPolicy(
+        destBucket,
+        options.dataSyncPrincipal,
+        options.dataSyncRole,
+        destS3Client
+      );
+    }
+    catch (error) {
+      return { result, error };
+    }
   }
-  catch (error) {
-    return { result, error };
+  else {
+    try {
+      await updateBucketPolicy(
+        srcBucket,
+        options.dataSyncPrincipal,
+        options.dataSyncRole,
+        srcS3Client
+      );
+    }
+    catch (error) {
+      return { result, error };
+    }
   }
 
   // prepare datasync S3 source
@@ -321,8 +350,8 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
     try {
       let response = await createDataSyncLocation(
         `arn:aws:s3:::${srcBucket}`,
-        options.srcDataSyncRole,
-        srcDataSyncClient
+        options.dataSyncRole,
+        dataSyncClient
       );
   
       if (!response.LocationArn) {
@@ -347,8 +376,8 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
     try {
       let response = await createDataSyncLocation(
         `arn:aws:s3:::${destBucket}`,
-        options.srcDataSyncRole,
-        srcDataSyncClient
+        options.dataSyncRole,
+        dataSyncClient
       );
   
       if (!response.LocationArn) {
@@ -375,8 +404,8 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
         taskName,
         result.dataSyncSrcLocation,
         result.dataSyncDestLocation,
-        options.srcCloudWatchLogGroup,
-        srcDataSyncClient
+        options.cloudWatchLogGroup,
+        dataSyncClient
       );
   
       if (!response.TaskArn) {
@@ -395,7 +424,7 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
 
   // execute transfer task
   try {
-    let response = await startTask(result.dataSyncTask, srcDataSyncClient);
+    let response = await startTask(result.dataSyncTask, dataSyncClient);
 
     if (!response.TaskExecutionArn) {
       throw new Error(
