@@ -28,18 +28,17 @@ import { S3Client } from '@aws-sdk/client-s3';
  * ARN of an existing CloudWatch log group, where DataSync logs will be recorded
  * into.
  *
- * The log group must be owned by the same AWS account that owns the source S3
- * bucket.
+ * The log group must be owned by the initiating AWS account.
  *
  * @property {string} dataSyncPrincipal
- * [AWS principal][1] under the source AWS account (i.e., the same account where
- * the  source S3 bucket belongs to), to be granted `s3:ListBucket` on the the
- * destination bucket.
+ * [AWS principal][1] scoped to the initiating AWS account, to be granted
+ * `s3:ListBucket` on the the bucket pressumably not owned by the initiating AWS
+ * account.
  *
- * This is useful for finer security control over the destination S3 bucket,
+ * This is useful for finer security control over the latter S3 bucket,
  * [especially for cross-account S3 transfers][2], wherein the source and
  * destination buckets are owned by different AWS accounts. If the buckets
- * belong to the same AWS account, you want to specify the AWS account ID as
+ * belong to the same AWS account, you can simply specify the AWS account ID as
  * principal, or a narrower version involving it (e.g., an existing IAM role).
  *
  * [1]: https://docs.aws.amazon.com/IAM/latest/UserGuide/reference_policies_elements_principal.html#Principal_specifying
@@ -49,8 +48,8 @@ import { S3Client } from '@aws-sdk/client-s3';
  * ARN of an existing IAM role that DataSync will assume when executing the
  * transfer task.
  *
- * This role must have the [necessary permissions][1] for the transfer task to
- * execute successfully.
+ * This role must be owned by the initiating AWS account, and must have the
+ * [necessary permissions][1] for the transfer task to execute successfully.
  *
  * [1]: https://docs.aws.amazon.com/datasync/latest/userguide/create-s3-location.html#create-role-manually
  */
@@ -286,9 +285,8 @@ export function checkIncompleteTransfer(transferOutput) {
  * Client for the S3 service of the same AWS account that owns the destination
  * bucket.
  * 
- * @param {DataSyncClient} srcDataSyncClient
- * Client for the DataSync service of the same AWS account that owns the source
- * bucket.
+ * @param {DataSyncClient} dataSyncClient
+ * Client for the DataSync service of the initiating AWS account.
    * 
    * @param {Partial<DataSyncS3TransferOutput>} prevState
    * If the call to this function fails for any reason, it likely causes at
@@ -309,7 +307,7 @@ export function checkIncompleteTransfer(transferOutput) {
  * Resources created as byproduct of the DataSync task execution, and a
  * contained exception if there is any during processing.
  */
-async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options, srcS3Client, destS3Client, srcDataSyncClient, prevState) {
+async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options, srcS3Client, destS3Client, dataSyncClient, prevState) {
   /**
    * @type {Partial<DataSyncS3TransferOutput>}.
    */
@@ -353,7 +351,7 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
       let response = await createDataSyncLocation(
         `arn:aws:s3:::${srcBucket}`,
         options.dataSyncRole,
-        srcDataSyncClient
+        dataSyncClient
       );
   
       if (!response.LocationArn) {
@@ -379,7 +377,7 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
       let response = await createDataSyncLocation(
         `arn:aws:s3:::${destBucket}`,
         options.dataSyncRole,
-        srcDataSyncClient
+        dataSyncClient
       );
   
       if (!response.LocationArn) {
@@ -407,7 +405,7 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
         result.dataSyncSrcLocation,
         result.dataSyncDestLocation,
         options.cloudWatchLogGroup,
-        srcDataSyncClient
+        dataSyncClient
       );
   
       if (!response.TaskArn) {
@@ -426,7 +424,7 @@ async function _execDataSyncS3Transfer(taskName, srcBucket, destBucket, options,
 
   // execute transfer task
   try {
-    let response = await startTask(result.dataSyncTask, srcDataSyncClient);
+    let response = await startTask(result.dataSyncTask, dataSyncClient);
 
     if (!response.TaskExecutionArn) {
       throw new Error(
