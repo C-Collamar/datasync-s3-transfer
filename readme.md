@@ -165,7 +165,26 @@ This way, successfully created AWS resources will be reused when retrying the tr
 
 In order to create the necessary DataSync resources on the initiating AWS account, this script assumes the IAM user behind the provided AWS config of the initiating account. In other words, using the code snippet from the [Usage](#usage) section as context, if `initiatingAccount` equals `source`, then the `srcAwsProfile` is used to create said resources. Else, if `initiatingAccount` equals `destination`, then the `destAwsProfile` is used instead.
 
-This implies that the IAM user assumed by this script must have the proper permissions to setup the DataSync-S3 transfer. For that, see [Required permissions for your account][1], under user permissions.
+This implies that the IAM user assumed by this script must be permitted certain actions in order to setup the DataSync-S3 transfer. These actions are:
+
+- `datasync:CancelTaskExecution`
+- `datasync:CreateLocationS3`
+- `datasync:CreateTask`
+- `datasync:DescribeLocation*`
+- `datasync:DescribeTask`
+- `datasync:DescribeTaskExecution`
+- `datasync:ListLocations`
+- `datasync:ListTasks`
+- `datasync:ListTaskExecutions`
+- `datasync:StartTaskExecution`
+- `iam:AttachRolePolicy`
+- `iam:CreateRole`
+- `iam:CreatePolicy`
+- `iam:ListRoles`
+- `iam:PassRole`
+- `s3:GetBucketLocation`
+- `s3:ListAllMyBuckets`
+- `s3:ListBucket`
 
 ### IAM Role Permissions
 
@@ -227,6 +246,5 @@ flowchart TD
     out --> stop
 ```
 
-[1]: https://docs.aws.amazon.com/datasync/latest/userguide/tutorial_s3-s3-cross-account-transfer.html#s3-s3-cross-account-required-permissions-source-account
 [2]: https://repost.aws/knowledge-center/s3-large-transfer-between-buckets
 [3]: https://github.com/C-Collamar/datasync-s3-transfer/issues/1
