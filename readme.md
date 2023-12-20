@@ -188,7 +188,36 @@ This implies that the IAM user assumed by this script must be permitted certain 
 
 ### IAM Role Permissions
 
-The IAM role, whose ARN is passed in the `srcDataSyncRole` DataSync initialization option, must have the necessaary permissions as shown in the following policy document:
+The IAM role, whose ARN is passed in the `srcDataSyncRole` DataSync initialization option, must have the following permission setup as mentioned in [Creating an IAM role for DataSync to access your S3 bucket][4].
+
+**Role trust relationship:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "datasync.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": {
+          "aws:SourceAccount": "ACCOUNT_ID"
+        },
+        "StringLike": {
+          "aws:SourceArn": "arn:aws:datasync:AWS_REGION:ACCOUNT_ID:*"
+        }
+      }
+    }
+  ]
+}
+```
+
+Replace `ACCOUNT_ID` with the AWS account ID that owns the role, and `AWS_REGION` with the region you only want DataSync to work on. Restricting the trust relationship this way is recommended to prevent the cross-service deputy problem.
+
+**Role permission policy:**
 
 ```json
 {
@@ -220,7 +249,7 @@ The IAM role, whose ARN is passed in the `srcDataSyncRole` DataSync initializati
 }
 ```
 
-The idea is to allow certain actions on S3 objects that belong to the source and destination buckets. And by scoping the `Resource` properties as such, you can initiate S3 object transfers from _any_ buckets in the source AWS accuont, to _any_ buckets in the destination AWS account.
+For the role permission policy, the idea is to allow certain actions on S3 objects that belong to the source and destination buckets. And by scoping the `Resource` properties as such, you can initiate S3 object transfers from _any_ buckets in the source AWS accuont, to _any_ buckets in the destination AWS account.
 
 That being said, you can limit the scope of the `Resource` policy elements by explicitly listing the source and destination buckets only. Just keep in mind that S3 object transfers will not work if neither the source nor destination bucket is not included in this scope.
 
@@ -248,3 +277,4 @@ flowchart TD
 
 [2]: https://repost.aws/knowledge-center/s3-large-transfer-between-buckets
 [3]: https://github.com/C-Collamar/datasync-s3-transfer/issues/1
+[4]: https://docs.aws.amazon.com/datasync/latest/userguide/create-s3-location.html#create-role-manually
