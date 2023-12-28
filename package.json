@@ -1,6 +1,6 @@
 {
   "name": "@c-collamar/datasync-s3-transfer",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "Automate S3 object transfers between buckets via DataSync",
   "type": "module",
   "main": "index.js",
@@ -18,5 +18,5 @@
     "#lib/*.js": "./lib/*.js"
   },
   "exports": "./index.js",
-  "repository": "github:c-collamar/datasync-s3-transfer"
+  "repository": "https://github.com/C-Collamar/datasync-s3-transfer"
 }
