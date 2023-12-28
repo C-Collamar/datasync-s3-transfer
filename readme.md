@@ -11,6 +11,12 @@ Automate S3 object transfers between buckets via DataSync!
 
 ## Usage
 
+1. Install this package.
+
+   ```
+   npm install @c-collamar/datasync-s3-transfer
+   ```
+
 1. Prepare inputs.
 
    ```js
@@ -58,7 +64,7 @@ Automate S3 object transfers between buckets via DataSync!
 
 1. Start the transfer. That's it!
    ```js
-   import { initDataSyncS3Transfer } from "datasync-s3-transfer";
+   import { initDataSyncS3Transfer } from "@c-collamar/datasync-s3-transfer";
 
    // configure transfer settings
    const transfer = initDataSyncS3Transfer(srcAwsConfig, destAwsConfig, dataSyncOptions);
