@@ -12,5 +12,7 @@ on:
 
 jobs:
   npm-publish:
-    if:  ${{ inputs.registry == 'npmjs' }} 
+    if:  ${{ inputs.registry == 'npmjs' }}
+    permissions:
+      id-token: write
     uses: ./.github/workflows/npm-publish.yml
