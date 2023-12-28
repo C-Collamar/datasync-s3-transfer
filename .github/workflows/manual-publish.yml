@@ -13,5 +13,4 @@ on:
 jobs:
   npm-publish:
     if:  ${{ inputs.registry == 'npmjs' }} 
-    uses: ./npm-publish.yml@main
-    runs-on: ubuntu-latest
+    uses: .github/workflows/npm-publish.yml@main
