@@ -24,9 +24,6 @@ on:
 
 jobs:
   npm-publish:
-    uses: ./npm-publish.yml
-    runs-on: ubuntu-latest
     if:  ${{ inputs.registry == 'npmjs' }} 
-    steps:
-      - name: Print the input tag to STDOUT
-        run: echo  The tags are ${{ inputs.tags }} 
+    uses: ./npm-publish.yml@main
+    runs-on: ubuntu-latest
