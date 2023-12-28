@@ -275,6 +275,10 @@ flowchart TD
     out --> stop
 ```
 
+## License
+
+This project is licensed under the terms of the the 3-Clause BSD license.
+
 [2]: https://repost.aws/knowledge-center/s3-large-transfer-between-buckets
 [3]: https://github.com/C-Collamar/datasync-s3-transfer/issues/1
 [4]: https://docs.aws.amazon.com/datasync/latest/userguide/create-s3-location.html#create-role-manually
