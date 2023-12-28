@@ -1,9 +1,9 @@
 name: Publish to npmjs
 
 on:
-  - workflow_call
-  - release:
-      types: [created]
+  workflow_call
+  release:
+    types: [created]
 
 jobs:
   publish-npm:
