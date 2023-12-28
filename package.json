@@ -17,5 +17,6 @@
   "imports": {
     "#lib/*.js": "./lib/*.js"
   },
-  "exports": "./index.js"
+  "exports": "./index.js",
+  "repository": "github:c-collamar/datasync-s3-transfer"
 }
