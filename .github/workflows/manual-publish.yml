@@ -1,0 +1,32 @@
+name: Manually publish to a registry
+
+on:
+  workflow_dispatch:
+    inputs:
+      registry:
+        description: 'Registry name'
+        required: true
+        type: choice
+        options:
+          - npmjs
+      print_tags:
+        description: 'True to print to STDOUT'
+        required: true
+        type: boolean
+      tags:
+        description: 'Test scenario tags'
+        required: true
+        type: string
+      environment:
+        description: 'Environment to run tests against'
+        type: environment
+        required: true
+
+jobs:
+  npm-publish:
+    uses: ./npm-publish.yml
+    runs-on: ubuntu-latest
+    if:  ${{ inputs.registry == 'npmjs' }} 
+    steps:
+      - name: Print the input tag to STDOUT
+        run: echo  The tags are ${{ inputs.tags }} 
