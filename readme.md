@@ -13,7 +13,7 @@ Automate S3 object transfers between buckets via DataSync!
 
 1. Install this package.
 
-   ```
+   ```bash
    npm install @c-collamar/datasync-s3-transfer
    ```
 

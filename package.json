@@ -18,5 +18,11 @@
     "#lib/*.js": "./lib/*.js"
   },
   "exports": "./index.js",
-  "repository": "https://github.com/C-Collamar/datasync-s3-transfer"
+  "repository": "https://github.com/C-Collamar/datasync-s3-transfer",
+  "keywords": [
+    "amazon",
+    "aws",
+    "datasync",
+    "s3"
+  ]
 }
